@@ -6,6 +6,46 @@
 import psycopg2
 
 
+def read(query, params=()):
+    """
+    Wraps a generic read query (i.e. one in which the entire results set should
+    be returned to the caller) with calls to open and close a connection and
+    cursor.
+
+    Args:
+        query: The SQL query to execute
+        params: A tuple of arguments to interpolate the query
+
+    Returns:
+        An array of tuples representing rows in the result
+    """
+
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(query, params)
+    result = cur.fetchall()
+    return result
+
+
+def write(query, params=()):
+    """
+    Wraps a generic write query (i.e. one in which the query should be executed
+    and committed) with calls to open and close a connection and cursor, and
+    commit the transaction.
+
+    Args:
+        query: The SQL query to execute
+        params: A tuple of arguments to interpolate the query
+    """
+
+    conn = connect()
+    cur = conn.cursor()
+    cur.execute(query, params)
+    conn.commit()
+    cur.close()
+    conn.close()
+
+
 def connect():
     """Connect to the PostgreSQL database.  Returns a database connection."""
     return psycopg2.connect("dbname=tournament")
@@ -13,14 +53,17 @@ def connect():
 
 def deleteMatches():
     """Remove all the match records from the database."""
+    write("DELETE FROM Matches;")
 
 
 def deletePlayers():
     """Remove all the player records from the database."""
+    write("DELETE FROM Players;")
 
 
 def countPlayers():
     """Returns the number of players currently registered."""
+    return read("SELECT COUNT(*) FROM Players;")[0][0]
 
 
 def registerPlayer(name):
@@ -32,6 +75,7 @@ def registerPlayer(name):
     Args:
       name: the player's full name (need not be unique).
     """
+    write("INSERT INTO Players (name) VALUES (%s);", (name,))
 
 
 def playerStandings():
@@ -47,6 +91,7 @@ def playerStandings():
         wins: the number of matches the player has won
         matches: the number of matches the player has played
     """
+    return read("SELECT id, name, wins, wins+losses as matches FROM standings")
 
 
 def reportMatch(winner, loser):
@@ -56,6 +101,8 @@ def reportMatch(winner, loser):
       winner:  the id number of the player who won
       loser:  the id number of the player who lost
     """
+    write("INSERT INTO Matches (winner, loser) VALUES (%s, %s);",
+          (winner, loser,))
  
  
 def swissPairings():
@@ -73,5 +120,4 @@ def swissPairings():
         id2: the second player's unique id
         name2: the second player's name
     """
-
-
+    return read("SELECT id1, name1, id2, name2 FROM next_round");
